@@ -3,24 +3,104 @@ title: "1-BasicMap"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## Basic Map
 
-We are going to make a basic map, but, this not a basic procedure.
+We are going to make a basic map, but, this not a basic procedure. We have this file to expain things and a single R script (1-BasicMap.R).
 
-```{r cars}
-summary(cars)
+## End Goal
+
+
+## We Need Packages
+Packages extend what basic R can do. For plotting a map we need several pacakges. Here are the ones we need for this example.
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(maps)
+library(mapdata)
+library(ggrepel)
 ```
 
-## Including Plots
+The library command loads packages. Do you have these installed?
 
-You can also embed plots, for example:
+How can they be installed? Either within RStudio's GUI or with install.packages command. We can talk about what these are.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+## Getting our worldmap
+We can get a basic outline of the world with the map_data command. Here is what that looks like.
+```{r}
+world<-map_data("world")
+head(world)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+This style of data is easily plotted with ggplot. We can use the geom_polygon command and supply the x and y axes. The group tells geom_polygon what points to combine togethere. In the example here, every single "Aruba" point is in group 1.
+
+```{r}
+ggplot(world)+geom_polygon(aes(x=long, y=lat, group=group))
+```
+
+If we were only interested in a particular country we can select that in a couple of ways. Check if these are the same.
+```{r}
+taiwan1<-subset(world, region %in% c("Taiwan"))
+taiwan2<-world %>% filter(region=="Taiwan")
+
+ggplot(taiwan1)+geom_polygon(aes(x=long, y=lat, group=group))
+ggplot(taiwan2)+geom_polygon(aes(x=long, y=lat, group=group))
+```
+
+## Making Things Pretty
+We can make some alterations for aesthetics with the following commands and at the same time save this for later. There are many options that you can use to alter how things look in ggplot, and we could spend forever on that.
+```{r}
+
+map<-ggplot(world)+
+  geom_polygon(aes(x=long, y=lat, group=group), fill="darkgrey")+
+  coord_fixed(ratio=1.3)+
+  ggtitle("A World Map")+
+  xlab("Longitude")+
+  ylab("Latitude")+
+  theme_classic()+
+  theme(plot.title = element_text(hjust = 0.5))
+
+map
+```
+
+## Point Data
+A common thing to do is plot point data. I made a text file of Taiwanese cities, coordinates, and population size. Something like this can easily be read into R and plotted with ggplot.
+
+* There are many ways to read a file
+* Make sure you are pointing to it
+
+```{r}
+data<-read.csv(file = "cities.txt", sep="\t")
+
+#This is what it looks like
+typeof(data)
+data
+```
+
+We can again use ggplot to plot these data
+```{r}
+ggplot()+geom_point(data=data, aes(x=Longitude, y=Latitude))
+```
+
+I would make this a bit different.
+```{r}
+ggplot()+geom_point(data=data, aes(x=Longitude, y=Latitude, size=Population), color="blue")+
+  geom_label_repel(data=data, aes(x=Longitude, y=Latitude, label=City))
+
+```
+
+## Include These on a Map
+We saved "map" earlier as a variable.
+```{r}
+map+geom_point(data=data, aes(x=Longitude, y=Latitude, size=Population), color="blue")+
+  geom_label_repel(data=data, aes(x=Longitude, y=Latitude, label=City))
+```
+
+That plot wasn't very helpful! We can zoom with coord_cartesian.
+
+```{r}
+map+geom_point(data=data, aes(x=Longitude, y=Latitude, size=Population), color="blue")+
+  geom_label_repel(data=data, aes(x=Longitude, y=Latitude, label=City))+
+  coord_cartesian(xlim=c(min(data$Longitude)-1, max(data$Longitude)+1),
+                  ylim=c(min(data$Latitude)-1, max(data$Latitude)+1))
+```

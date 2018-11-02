@@ -3,3 +3,6 @@ For storing material from the Marine Phylogenomics lab at NTU. Different subject
 
 ## 1-BasicMap
 How to make a basic map with R utilzing ggplot.
+
+## 2-AquaMaps.R
+Example plotting raster data from AquaMaps

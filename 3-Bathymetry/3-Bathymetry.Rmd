@@ -1,0 +1,122 @@
+---
+title: "3-Bathymetry"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## 3-Bathymetry
+A quick look at plotting data points on to a bathymetric map. We are going to use Adrian's collection data and an open source bathymetry map.
+
+
+## Data Manipulation
+As part of the tidyverse, dplyr provides a fast way to alter data. It works around "verbs" https://dplyr.tidyverse.org/. I'll use these dplyr verbs and a pipe, \%>\%, to summarize Adrian's collection information.
+
+First off I'll read in the data and then covert to a tibble. To do so I first converted the original .xlsx to a .csv. Reading in an .xlsx is certainly possible, but more complicated.
+
+A tibble makes it easier for us to view. It limits the output in terms of length and number of digits, etc. Importantly, it tells us what is in each column, i.e. numbers or characters or factors.
+```{r,  warnings=FALSE, message=FALSE}
+library(tidyverse)
+library(ggrepel)
+
+data<-as_tibble(read.csv(file="Chelidoperca_geodata.csv"))
+
+data
+```
+
+These data have several columns that dplyr can act on. We'll send the data along to different verbs with \%>\%. Let's look at how the data are organized a bit more.
+
+There are multiple species entries for the same locations and about the same depth. We can use dplyr functions to reshape the data.
+
+One thing I would like is to rename the columns.
+
+```{r}
+df1<-data %>% rename(Species=Species.name, MeanDepth=Mean.depth..m.)
+
+df1
+```
+The object data was sent to the rename function and the output stored as df1.
+
+I would like the data in terms of how many collections/site at a certain mean depth.
+
+* group_by groups by column name, those entries that share the same Species, Latitude, Longitude, and Mean Depth are put together.
+
+* count() gives us the number in the group in a new column "n"
+
+* rename changes n to N.
+```{r}
+df2<-df1 %>% group_by(Species, Latitude, Longitude, MeanDepth) %>%
+  count() %>%
+  rename(N=n)
+
+df2
+```
+
+## Plotting Points
+Now we can plot our points with ggplot!
+
+```{r}
+ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude))
+```
+
+Two aesthetics controlled within aes() seem relevant to me. We can make the size proportional to the sample number. We can also use color to distinguish species?
+```{r}
+ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
+                                  size=N, color=Species))+
+  theme(legend.title.align = 0.5)
+```
+
+What should we do to make this plot better? I want to change the points to have a black outline which we can specify with shape=21. At this point, color is the outside of the point and fill the inside. Alpha lets us control opacity.
+
+Like viridis, there is another color package for r, RColorBrewer. It has been made part of ggplot:
+https://ggplot2.tidyverse.org/reference/scale_brewer.html
+
+Maybe this looks better?
+
+```{r}
+ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
+                                  size=N, fill=Species), shape=21,
+                    alpha=0.75)+
+  geom_text_repel(data=df2, aes(x=Longitude, y=Latitude,
+                                 label=Species))+
+  theme(legend.title.align = 0.5)+
+  scale_fill_brewer(type="div", palette = "Spectral")
+```
+
+Well, we have a lot of options, so what should we do? 
+
+Note: Aesthetics can be inherited.
+```{r}
+ggplot(df2)+geom_point(aes(x=Longitude, y=Latitude), color="black",
+                    alpha=0.75)+
+  geom_text_repel(aes(x=Longitude, y=Latitude, label=Species))+
+  theme(legend.title.align = 0.5)
+```
+
+## Facets
+I think we should facet! This allows us to split our plots with the commands facet_wrap or facet_grid.
+
+```{r}
+ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
+                                  size=N, fill=Species), shape=21,
+                    alpha=0.75)+
+  facet_wrap(.~Species, nrow=3)
+```
+
+A few adjustments maybe make it nicer. In this way we see some species are distributed in the NW of the plots, some in the SE, and in the middle too. Rather than species, it seems to me the depth that the species are collected at is important. 
+
+```{r}
+ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
+                                  size=N, fill=MeanDepth), shape=21,
+                    alpha=0.75)+
+  theme_bw()+
+  theme(legend.title.align = 0.5,
+        axis.text.x = element_text(angle = 90, hjust = 1))+
+  scale_fill_viridis_c()+
+  coord_fixed(1.3, xlim = c(110, 175), ylim=c(-29,25) )+
+  facet_wrap(.~Species, nrow=3)
+```
+
+## What About Geography?
+Clearly these species are not just hanging out in white space. There appear to be three locations where the species cluster and depth seems to matter. We can look at bathymetry data.

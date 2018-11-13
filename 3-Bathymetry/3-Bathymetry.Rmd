@@ -54,9 +54,9 @@ df2
 ```
 
 ## Plotting Points
-Now we can plot our points with ggplot!
+Now we can plot our points with ggplot! Can you make this plot with geom_point?
 
-```{r}
+```{r, echo=FALSE}
 ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude))
 ```
 
@@ -104,10 +104,10 @@ ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
   facet_wrap(.~Species, nrow=3)
 ```
 
-A few adjustments maybe make it nicer. In this way we see some species are distributed in the NW of the plots, some in the SE, and in the middle too. Rather than species, it seems to me the depth that the species are collected at is important. 
+A few adjustments maybe make it nicer. In this way we see some species are distributed in the NW of the plots, some in the SE, and in the middle too. Rather than species, it seems to me the depth that the species are collected at is important. I've also stored this as an object called plot. 
 
 ```{r}
-ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
+plot<-ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
                                   size=N, fill=MeanDepth), shape=21,
                     alpha=0.75)+
   theme_bw()+
@@ -116,7 +116,79 @@ ggplot()+geom_point(data=df2, aes(x=Longitude, y=Latitude,
   scale_fill_viridis_c()+
   coord_fixed(1.3, xlim = c(110, 175), ylim=c(-29,25) )+
   facet_wrap(.~Species, nrow=3)
+
+plot
 ```
 
 ## What About Geography?
-Clearly these species are not just hanging out in white space. There appear to be three locations where the species cluster and depth seems to matter. We can look at bathymetry data.
+Clearly these species are not just hanging out in white space. There appear to be three locations where the species cluster and depth seems to matter. 
+
+### Basic Map
+
+Can you include the basic world map onto the object "plot?"
+
+I've included the following to remove gridlines:
+
+theme(panel.grid.major = element_blank(), panel.grid.minor =  element_blank())
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(mapdata)
+library(maps)
+world<-map_data("world")
+
+plot+geom_polygon(data=world, aes(x=long, y=lat, group=group))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor =  element_blank())
+```
+
+### Bathymetry
+There are public bathymetry maps available. ETOPO1 is an option produced by NOAA (https://www.ngdc.noaa.gov/mgg/global/global.html).
+
+We have two options here. We can download the raw ETOPO data ourselves, or, us an existing R library. Searching online I found "marmap". This requires an internet connection so I have saved the resulting bathy object as file for you "bathy.rda" which took the following commands which you don't need to do.
+```{r}
+# library(marmap)
+# bathy<-getNOAA.bathy(lon1 = 100, lon2 = 180, lat1=-35, lat2=35, resolution=10)
+# save("bathy", file="bathy.rda")
+
+```
+
+Now, to load the data and convert it to something useful. Marmap has a built in function "fortify.bathy()" to convert to a dataframe which is good for ggplot. This produces data that is compatible with geom_raster.
+Note the range of the z-axis: it includes elevation on land.
+```{r, warning=FALSE, message=FALSE}
+library(marmap)
+load(file="bathy.rda")
+bathyDf<-fortify.bathy(bathy)
+
+ggplot()+geom_raster(data=bathyDf, aes(x=x, y=y, fill=z))
+```
+
+
+I think we should filter out values in our bathymetry data frame > 0. Here is one way to do that by adding a new column "Depth" with ifelse.
+
+ifelse(test, yes, no)
+```{r}
+summary(bathyDf$z)
+
+bathyDf2<-bathyDf %>% mutate(Depth = ifelse(z > 0, 0, z))
+
+summary(bathyDf2$Depth)
+```
+
+Ok, so let's put that all together. ggplot plots in the order we specify. So we want to put our points on last or else they may be covered.
+
+Other than that, I don't know what looks good! It is really troublesome to produce more than one fill scale and we can try that another day.
+
+```{r}
+ggplot()+geom_raster(data=bathyDf2, aes(x=x, y=y, fill=Depth))+
+ geom_polygon(data=world, aes(x=long, y=lat, group=group),
+              fill="grey50", color="grey50")+
+  geom_point(data=df2, aes(x=Longitude, y=Latitude,
+                                  size=N, fill=MeanDepth), shape=21,
+                    alpha=0.75)+
+  theme_bw()+
+  theme(legend.title.align = 0.5,
+        axis.text.x = element_text(angle = 90, hjust = 1))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor =  element_blank())+
+  scale_fill_viridis_c()+
+  coord_fixed(1.3, xlim = c(110, 175), ylim=c(-29,25) )+
+  facet_wrap(.~Species, nrow=3)
+```

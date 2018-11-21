@@ -6,3 +6,6 @@ How to make a basic map with R utilzing ggplot.
 
 ## 2-AquaMaps.R
 Example plotting raster data from AquaMaps
+
+## 3-Bathymetry.R
+Plotting points with bathymetry data, using facets.

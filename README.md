@@ -4,8 +4,11 @@ For storing material from the Marine Phylogenomics lab at NTU. Different subject
 ## 1-BasicMap
 How to make a basic map with R utilzing ggplot.
 
-## 2-AquaMaps.R
-Example plotting raster data from AquaMaps
+## 2-AquaMaps
+Example plotting raster data from AquaMaps.
 
-## 3-Bathymetry.R
+## 3-Bathymetry
 Plotting points with bathymetry data, using facets.
+
+## 4-GBIF
+An idea on how to plot data from GBIF.

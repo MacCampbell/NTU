@@ -1,0 +1,133 @@
+---
+title: "4-GBIF"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## GBIF Data
+An idea on how to plot GBIF data.
+https://www.gbif.org/
+
+This is a way to make your own range maps. There are several other ways to go about retrieving data from GBIF such as the "rgbif" R package.
+
+## Watch out for....
+Coordinates, what is classified. Pleuronectidae for example contains a few other families on GBIF. Pleuronectiformes also creates a 357 Mb data file. Downloading via an API (with rgbif) is a bit cumbersome at that point.
+
+## Starting data.
+I have created a file for all Bothidae occurrence records with GBIF: https://doi.org/10.15468/dl.mpxaok
+
+It is too large to synch well with GitHub... So, I made it smaller by only keeping a few key fields.
+family	genus	species	decimalLatitude	decimalLongitude
+
+This reduced file is in /4-GBIF/ folder and is named "bothidae.csv" and is ~ 3 Mb.
+
+## Starting out
+What does the data file look like? What do we want in the end to make a raster? You can open it with a text editor and take a look. 
+
+What we need to do do is import the data into R. Like last time, I made a tibble.
+
+* I used the tidyverse library (and dplyr)
+* To load the file, I used read.table
+* It is important to consider missing entries in the table with GBIF data...
+* I used as_tibble
+* I used rename
+
+Create a tibble like so:
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE}
+library("tidyverse")
+gbif<-read.table(file="bothidae.csv", header=TRUE, sep="\t",
+                 fill = TRUE) 
+
+gbifdf<-as_tibble(gbif) %>%
+ rename(Latitude=decimalLatitude, Longitude=decimalLongitude) %>%
+  rename(Family=family, Genus=genus, Species=species)
+
+gbifdf
+```
+
+## What do we want again?
+We would like to have an estimate of number of species within an a degree grid square (e.g. species in 1 deg Latitude by 1 deg Longitude). You may have noticed that we have entries just for Bothidae with no species. Let's remove those.
+
+* Use dplyr filter and a Boolean operator
+```{r,  warnings=FALSE, message=FALSE, echo=FALSE}
+df<-gbifdf %>% filter(Species != "")
+
+df
+```
+
+Should be ~7,000 less entries.
+
+## How to get species diversity within a grid square...
+
+### Creating an using a function in R.
+Converting our point collections to species is complicated. I have made a function and stored it in an external file, rasterize.R. This is the basics of using a function in R.
+
+The basic form of a function in R:
+
+* Declare variables e.g. (x,y)
+* Do something to variables (x*y)
+* Return something else
+
+```{r}
+Multiply <- function(x,y) {
+product<-x*y
+return(product)
+}
+```
+
+Here is how to use the function:
+```{r}
+Multiply(3,5)
+```
+
+The function should show up in your Environment tab within RStudion.
+
+### Rasterize
+The Rasterize function I wrote can be loaded with source. Can you source it?
+```{r}
+source("rasterize.R")
+```
+Rasterize requires three things:
+
+1. cellSize -> the grid square ofLongitude/Latidue as a number, e.g. 2
+2. breaks -> A vector to combine species counts e.g. c("10", "20", "30")
+3. dataFrame -> A data frame with Family, Genus, Species, Latitude, and Longitude columns.
+
+Using it:
+```{r}
+cellSize<-3
+breaks<-seq(0, length(levels(df$Species)), 5) # From 0 to 160 here by 10
+                   
+raster<-Rasterize(cellSize, breaks, df)
+raster
+```
+
+## Plotting diversity within grid squares.
+
+There are two options here. The Rasterize funciton returns a strict diversity count (1,2,3,4,5) or a range 1-10, 11-20, 21-30, etc.
+
+Plotting with "Diversity":
+
+```{r, echo=FALSE}
+ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude, 
+                                      fill=Diversity))+
+  scale_fill_continuous(low="yellow", high="red")+
+  coord_fixed(1.3)+
+  theme_classic()
+```
+
+Plotting with "Breaks" requires us to set our own color scale. 
+
+```{r, echo=FALSE}
+number<-length(unique(raster$Breaks))
+colors<-rev(heat.colors(number))
+
+ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude, 
+                                      fill=Breaks))+
+  scale_fill_manual(values=colors)+
+  coord_fixed(1.3)+
+  theme_classic()
+```

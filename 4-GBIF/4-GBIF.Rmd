@@ -12,16 +12,39 @@ https://www.gbif.org/
 
 This is a way to make your own range maps. There are several other ways to go about retrieving data from GBIF such as the "rgbif" R package.
 
+"bdvis" provides downloading/mapping instructions that may work for you:
+https://doi.org/10.1093/bioinformatics/btw333
+
+It didn't work for me, so I downloaded the GBIF data myself.
+
 ## Watch out for....
-Coordinates, what is classified. Pleuronectidae for example contains a few other families on GBIF. Pleuronectiformes also creates a 357 Mb data file. Downloading via an API (with rgbif) is a bit cumbersome at that point.
+
+* Coordinates: Does the entry have them?
+* Sampling bias? Some places have more records than others...
+* What is classified. Pleuronectidae for example contains a few other families on GBIF. 
+* How specific is the identification? To species? To genus?
+
+Pleuronectiformes also creates a 357 Mb data file. Downloading via an API (with rgbif) is a bit cumbersome at that point.
 
 ## Starting data.
 I have created a file for all Bothidae occurrence records with GBIF: https://doi.org/10.15468/dl.mpxaok
 
-It is too large to synch well with GitHub... So, I made it smaller by only keeping a few key fields.
+It is too large to synch well with GitHub... So, I made it smaller by only keeping a few key fields:
+
 family	genus	species	decimalLatitude	decimalLongitude
 
 This reduced file is in /4-GBIF/ folder and is named "bothidae.csv" and is ~ 3 Mb.
+
+#### Side Note: How I reduced the file size with bash.
+I found the GBIF file to be a problem to parse with all the fields as well making import in R pretty much impossible for me.
+
+Here is how I reduced the file to columns 8,9,10,17, and 18 at the command line. This is not with R.
+
+```{r, engine = 'bash', eval = FALSE}
+cat 0008756-181108115102211.csv | cut -f 8,9,10,17,18 > bothidae.csv 
+```
+
+
 
 ## Starting out
 What does the data file look like? What do we want in the end to make a raster? You can open it with a text editor and take a look. 
@@ -109,7 +132,16 @@ raster
 
 There are two options here. The Rasterize funciton returns a strict diversity count (1,2,3,4,5) or a range 1-10, 11-20, 21-30, etc.
 
-Plotting with "Diversity":
+#### Plotting with "Diversity":
+
+```{r}
+ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude, 
+                                      fill=Diversity))+
+  coord_fixed(1.3)+
+  theme_classic()
+```
+
+* Can you use "scale_fill_continuous" to change the color scheme?
 
 ```{r, echo=FALSE}
 ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude, 
@@ -119,7 +151,27 @@ ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude,
   theme_classic()
 ```
 
-Plotting with "Breaks" requires us to set our own color scale. 
+#### Plotting with "Breaks"
+Plotting with "Breaks" requires us to set our own color scale. I used the "heat.colors" function.
+
+```{r}
+
+heatColors<-heat.colors(10)
+
+ggplot()+geom_point(aes(x=seq(1,10,1), y=0), cex=10, color=heatColors)
+
+```
+
+```{r, eval=FALSE}
+number<-length(unique(raster$Breaks)) # Number of colors we need
+
+colors<-rev(heat.colors(number)) #heat.colors produces the number of colors, with yellow high and red low, so I reversed it.
+```
+
+We can incldue this custom scale in ggplot with the following command:
+```{r, eval=FALSE}
+scale_fill_manual(values=colors)
+```
 
 ```{r, echo=FALSE}
 number<-length(unique(raster$Breaks))
@@ -130,4 +182,43 @@ ggplot()+geom_raster(data=raster, aes(x=Longitude,y=Latitude,
   scale_fill_manual(values=colors)+
   coord_fixed(1.3)+
   theme_classic()
+```
+
+## What do you want to plot?
+Why don't you download your own taxon of interest and try to plot?
+
+```{r, echo=FALSE, warnings=FALSE, message=FALSE}
+library(maps)
+library(mapdata)
+
+world<-map_data("world")
+#Create to identical objects from world
+w1 <- world
+w2 <- world
+# Make one go 360 degrees longer
+w2$long <- w2$long + 360
+# Extend the groups so that they are not redundant
+w2$group <- w2$group + max(w2$group) + 1
+#Combine them
+newWorld <- rbind(w1, w2)
+newWorld <- newWorld %>% rename(Latitude=lat, Longitude=long)
+
+# doubling the raster
+raster2<-raster
+raster2$Longitude <- raster2$Longitude+360
+
+
+map<-ggplot(newWorld)+geom_polygon(aes(x=Longitude, y=Latitude,
+                                  group=group),  color="black",
+                                  fill="black", size=0.5)+
+  geom_raster(data=raster, aes(x=Longitude,y=Latitude, 
+                                      fill=Breaks))+
+  geom_raster(data=raster2, aes(x=Longitude,y=Latitude, 
+                                      fill=Breaks))+
+  scale_fill_manual(values=colors)+
+  coord_fixed(ratio=1.3, xlim = c(-0, 360), ylim=c(-90,90))+
+  theme_classic()+
+  theme(panel.background = element_rect(fill="lightblue"))
+
+map
 ```
